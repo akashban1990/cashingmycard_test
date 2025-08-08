@@ -1,11 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { auth } from '@/lib/firebase';
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-} from 'firebase/auth';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -13,17 +9,27 @@ export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [status, setStatus] = useState('');
 
+  useEffect(() => {
+    // Optional: show current auth state
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) setStatus(`🔐 Logged in as ${session.user.email}`);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus('Processing...');
 
     try {
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
         setStatus('✅ Logged in successfully');
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
-        setStatus('✅ Account created successfully');
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        setStatus('✅ Account created — check your email if confirm is required');
       }
     } catch (err: any) {
       setStatus(`❌ ${err.message}`);
@@ -50,10 +56,7 @@ export default function LoginPage() {
           onChange={(e) => setPassword(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded text-black"
         />
-        <button
-          type="submit"
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
-        >
+        <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">
           {isLogin ? 'Login' : 'Sign Up'}
         </button>
       </form>
@@ -65,7 +68,7 @@ export default function LoginPage() {
         {isLogin ? 'Need an account? Sign up' : 'Already have an account? Log in'}
       </button>
 
-      <p className="mt-4 text-sm text-gray-600">{status}</p>
+      <p className="mt-4 text-sm text-gray-700">{status}</p>
     </main>
   );
 }
